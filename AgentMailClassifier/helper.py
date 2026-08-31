@@ -1,14 +1,55 @@
 import asyncio
 from contextlib import asynccontextmanager
 import logging
+from logging.handlers import RotatingFileHandler
 import os
 import sqlite3
+from typing import Optional
 from aioimaplib import aioimaplib
 from model import IMAP_HOST, IMAP_PORT, IMAP_USER, PASSWORD
 
 logger = logging.getLogger("Pool.Helper")
 
 DB_PATH = os.getenv("DB_PATH", "classified_emails.db")
+LOG_DIR = os.getenv("LOG_DIR", os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs"))
+LOG_FILE = os.getenv("LOG_FILE", "agent.log")
+
+
+def setup_logging(
+    log_dir: str = LOG_DIR,
+    log_filename: str = LOG_FILE,
+    level: int = logging.INFO,
+    max_bytes: int = 10 * 1024 * 1024,
+    backup_count: int = 5,
+):
+    """Configure le logging global avec sortie console et fichier tournant (rotation)."""
+    os.makedirs(log_dir, exist_ok=True)
+    log_path = os.path.join(log_dir, log_filename)
+
+    formatter = logging.Formatter(
+        "%(asctime)s [%(levelname)s] [%(name)s] %(message)s"
+    )
+
+    root_logger = logging.getLogger()
+    root_logger.setLevel(level)
+
+    # Évite les doublons de handlers si setup_logging est appelé plusieurs fois
+    if not any(isinstance(h, RotatingFileHandler) and getattr(h, "baseFilename", None) == os.path.abspath(log_path) for h in root_logger.handlers):
+        file_handler = RotatingFileHandler(
+            log_path, maxBytes=max_bytes, backupCount=backup_count, encoding="utf-8"
+        )
+        file_handler.setLevel(level)
+        file_handler.setFormatter(formatter)
+        root_logger.addHandler(file_handler)
+
+    if not any(isinstance(h, logging.StreamHandler) and not isinstance(h, RotatingFileHandler) for h in root_logger.handlers):
+        stream_handler = logging.StreamHandler()
+        stream_handler.setLevel(level)
+        stream_handler.setFormatter(formatter)
+        root_logger.addHandler(stream_handler)
+
+    return log_path
+
 
 
 def init_db(db_path: str = DB_PATH):

@@ -1,8 +1,11 @@
+import email
+import logging
 from .state import WorkerState, EmailExtractionResult
 from langchain_core.messages import SystemMessage, HumanMessage
 from .helper import decode_str, strip_html, clean_text
-import email
 from .model import agent, SYSTEM_PROMPT, FOLDER_MAPPING
+
+logger = logging.getLogger("Worker.Nodes")
 
 
 def clean_node(state: WorkerState) -> dict:
@@ -66,6 +69,9 @@ def clean_node(state: WorkerState) -> dict:
 
     cleaned_body = clean_text(raw_body)[:1500]
 
+    mail_uid = state.mail_uid if hasattr(state, "mail_uid") else state.get("mail_uid", "?")
+    logger.debug(f"[UID {mail_uid}] Cleaned email: From='{sender}', Subject='{subject}', BodyLen={len(cleaned_body)}")
+
     # 4. Return the state update dictionary
     return {
         "sender": sender,
@@ -75,9 +81,12 @@ def clean_node(state: WorkerState) -> dict:
 
 
 def classify_node(state: WorkerState) -> dict:
+    mail_uid = state.mail_uid if hasattr(state, "mail_uid") else state.get("mail_uid", "?")
     sender = state.sender if hasattr(state, "sender") else state.get("sender")
     subject = state.subject if hasattr(state, "subject") else state.get("subject")
     cleaned_body = state.cleaned_body if hasattr(state, "cleaned_body") else state.get("cleaned_body")
+
+    logger.info(f"🤖 [UID {mail_uid}] Inférence LLM en cours...")
 
     user_content = f"""
     From: {sender}
@@ -91,6 +100,9 @@ def classify_node(state: WorkerState) -> dict:
     ]
 
     extraction_result: EmailExtractionResult = agent.invoke(messages)
+    logger.info(
+        f"🎯 [UID {mail_uid}] Résultat LLM: Category='{extraction_result.category}', ActionRequired={extraction_result.action_required}"
+    )
 
     return {"result": extraction_result}
 
@@ -105,6 +117,8 @@ async def move_email_node(state: WorkerState, imap_pool: "ImapConnectionPool") -
     category = result.category
     target_folder = FOLDER_MAPPING.get(category)
 
+    logger.info(f"📂 [UID {mail_uid}] Déplacement vers '{target_folder}'...")
+
     # Acquire a dedicated connection from the pool to perform IMAP actions
     async with imap_pool.get_connection() as imap_client:
         await imap_client.select("INBOX")
@@ -116,6 +130,7 @@ async def move_email_node(state: WorkerState, imap_pool: "ImapConnectionPool") -
             # Flag the original message as Deleted and expunge to complete the move
             await imap_client.uid("STORE", mail_uid, "+FLAGS", r"(\Deleted)")
             await imap_client.expunge()
+            logger.info(f"✨ [UID {mail_uid}] Email déplacé et purgé d'INBOX avec succès.")
         else:
             raise RuntimeError(
                 f"Failed to copy email UID {mail_uid} to {target_folder}"

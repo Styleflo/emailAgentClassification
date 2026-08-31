@@ -1,6 +1,7 @@
 import sys
 import os
 import asyncio
+import logging
 import unittest
 from unittest.mock import MagicMock, AsyncMock, patch
 
@@ -9,11 +10,32 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from model import IMAP_HOST
 from state import OrchestratorState
-from helper import ImapConnectionPool
+from helper import ImapConnectionPool, setup_logging
 from nodes import db_writer_worker, process_email_task
 from worker.state import WorkerState, EmailExtractionResult
 
 class TestOrchestrator(unittest.IsolatedAsyncioTestCase):
+
+    def test_setup_logging(self):
+        import tempfile
+        import shutil
+        temp_dir = tempfile.mkdtemp()
+        try:
+            log_path = setup_logging(log_dir=temp_dir, log_filename="test_agent.log")
+            self.assertTrue(os.path.exists(log_path))
+            
+            test_logger = logging.getLogger("TestLogger")
+            test_logger.info("Test message to log file")
+            
+            # Flush handlers to ensure content is written
+            for handler in logging.getLogger().handlers:
+                handler.flush()
+                
+            with open(log_path, "r", encoding="utf-8") as f:
+                content = f.read()
+            self.assertIn("Test message to log file", content)
+        finally:
+            shutil.rmtree(temp_dir, ignore_errors=True)
 
     def test_orchestrator_state(self):
         state = OrchestratorState(is_running=True, processed_count=5)

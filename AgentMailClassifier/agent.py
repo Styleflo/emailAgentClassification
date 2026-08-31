@@ -62,6 +62,9 @@ async def run_orchestrator():
                     else []
                 )
 
+                if msg_ids:
+                    logger.info(f"📬 {len(msg_ids)} email(s) non lu(s) détecté(s).")
+
                 for msg_id in msg_ids:
                     msg_num = msg_id.decode()
 
@@ -85,9 +88,11 @@ async def run_orchestrator():
 
                     # Déduplication : ignorer si déjà en cours de traitement
                     if mail_uid in PROCESSING_UIDS:
+                        logger.debug(f"[UID {mail_uid}] Déjà en cours de traitement, ignoré.")
                         continue
 
                     PROCESSING_UIDS.add(mail_uid)
+                    logger.info(f"🚀 [UID {mail_uid}] Soumission de la tâche de traitement.")
 
                     # Lancement asynchrone limité par le sémaphore
                     asyncio.create_task(
