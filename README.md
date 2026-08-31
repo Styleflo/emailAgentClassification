@@ -83,7 +83,7 @@ emailAgentClassification/
 
 ## Classification Categories & Routing
 
-Incoming emails are extracted and classified into exactly one of three categories:
+Incoming emails are extracted and classified into exactly one of three categories but you can add new categories in `FOLDER_MAPPING`:
 
 | Category | Description | `action_required` | Default IMAP Folder |
 | :--- | :--- | :--- | :--- |
@@ -107,7 +107,7 @@ CREATE TABLE IF NOT EXISTS classified_emails (
     sender TEXT,
     subject TEXT,
     cleaned_body_preview TEXT,
-    category TEXT CHECK(category IN ('Trash', 'Information', 'Review')),
+    category TEXT CHECK(category IN ({allowed_categories})),
     summary TEXT,
     action_required INTEGER CHECK(action_required IN (0, 1)),
     moved_to_folder TEXT,
