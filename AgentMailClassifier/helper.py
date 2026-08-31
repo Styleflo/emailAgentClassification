@@ -22,7 +22,7 @@ def setup_logging(
     max_bytes: int = 10 * 1024 * 1024,
     backup_count: int = 5,
 ):
-    """Configure le logging global avec sortie console et fichier tournant (rotation)."""
+    """Configures global logging with both console and rotating file outputs."""
     os.makedirs(log_dir, exist_ok=True)
     log_path = os.path.join(log_dir, log_filename)
 
@@ -33,7 +33,7 @@ def setup_logging(
     root_logger = logging.getLogger()
     root_logger.setLevel(level)
 
-    # Évite les doublons de handlers si setup_logging est appelé plusieurs fois
+    # Avoid duplicate handlers if setup_logging is invoked multiple times
     if not any(isinstance(h, RotatingFileHandler) and getattr(h, "baseFilename", None) == os.path.abspath(log_path) for h in root_logger.handlers):
         file_handler = RotatingFileHandler(
             log_path, maxBytes=max_bytes, backupCount=backup_count, encoding="utf-8"
@@ -53,7 +53,7 @@ def setup_logging(
 
 
 def init_db(db_path: str = DB_PATH):
-    """Initialise la base de données SQLite et crée la table si nécessaire."""
+    """Initializes SQLite database and creates table if needed."""
     with sqlite3.connect(db_path) as conn:
         cursor = conn.cursor()
         cursor.execute(
@@ -76,7 +76,7 @@ def init_db(db_path: str = DB_PATH):
 
 
 def insert_classified_email(record: dict, db_path: str = DB_PATH):
-    """Insère un enregistrement classifié dans la base SQLite."""
+    """Inserts a classified email record into SQLite."""
     mail_uid = record.get("mail_uid")
     sender = record.get("sender")
     subject = record.get("subject")
@@ -133,43 +133,43 @@ class ImapConnectionPool:
         self.pool = asyncio.Queue(maxsize=size)
 
     async def _create_single_client(self) -> aioimaplib.IMAP4_SSL:
-        """Crée, négocie et authentifie un nouveau socket IMAP."""
+        """Creates, negotiates SSL, and authenticates a new IMAP socket."""
         client = aioimaplib.IMAP4_SSL(host=IMAP_HOST, port=IMAP_PORT)
         await client.wait_hello_from_server()
         await client.login(IMAP_USER, PASSWORD)
         return client
 
     async def initialize(self):
-        """Remplit le pool au démarrage."""
+        """Fills the connection pool at startup."""
         logger.info(
-            f"Initialisation du pool IMAP ({self.size} connexions)..."
+            f"Initializing IMAP connection pool ({self.size} connections)..."
         )
         for _ in range(self.size):
             client = await self._create_single_client()
             await self.pool.put(client)
-        logger.info("Pool IMAP prêt.")
+        logger.info("IMAP connection pool ready.")
 
     @asynccontextmanager
     async def get_connection(self):
-        """Prête une connexion valide et la remplace automatiquement si elle est inactive/déconnectée."""
+        """Borrows a valid connection and automatically replaces it if inactive/disconnected."""
         client = await self.pool.get()
 
         try:
-            # --- 1. Health Check (Keep-Alive / Reconnexion) ---
+            # --- 1. Health Check (Keep-Alive / Reconnect) ---
             is_alive = False
             try:
                 if client.protocol is not None:
-                    # Envoi d'un NOOP avec timeout court (3s) pour vérifier la vivacité du socket
+                    # Send NOOP with short timeout (3s) to check socket liveness
                     res, _ = await asyncio.wait_for(client.noop(), timeout=3.0)
                     if res == "OK":
                         is_alive = True
             except Exception:
                 is_alive = False
 
-            # Si le socket est coupé (inactivité > 25 min ou reset réseau), on le recrée
+            # If the socket dropped (inactivity > 25 min or network reset), recreate it
             if not is_alive:
                 logger.warning(
-                    "Socket du pool inactive ou fermée détectée. Reconnexion en cours..."
+                    "Inactive or closed pool socket detected. Reconnecting..."
                 )
                 try:
                     await client.logout()
@@ -177,16 +177,16 @@ class ImapConnectionPool:
                     pass
                 client = await self._create_single_client()
 
-            # --- 2. Mise à disposition du client pour le sous-agent ---
+            # --- 2. Yield client to worker agent ---
             yield client
 
         finally:
-            # --- 3. Restitution systématique dans la file ---
+            # --- 3. Return connection back to the pool ---
             await self.pool.put(client)
 
     async def close_all(self):
-        """Ferme proprement toutes les connexions du pool lors de l'arrêt."""
-        logger.info("Fermeture du pool IMAP...")
+        """Gracefully closes all pool connections during shutdown."""
+        logger.info("Closing IMAP pool connections...")
         while not self.pool.empty():
             client = await self.pool.get()
             try:

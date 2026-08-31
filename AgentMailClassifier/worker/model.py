@@ -41,7 +41,7 @@ You MUST categorize the email into exactly ONE of the following 3 values:
 """
 
 FOLDER_MAPPING = {
-    "Trash": "[Gmail]/Trash",  # Envoie directement dans la corbeille Gmail
-    "Information": "Information",  # Ou un label custom comme 'Informations' à créer
-    "Review": "Review",  # Ou 'Personel' / un label 'Review'
+    "Trash": "[Gmail]/Trash",  # Sends directly to Gmail Trash
+    "Information": "Information",  # Custom destination label/folder
+    "Review": "Review",  # Custom review / human inbox label
 }

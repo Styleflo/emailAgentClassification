@@ -6,7 +6,7 @@ from model import IMAP_HOST, IMAP_PORT, IMAP_USER, PASSWORD
 from nodes import PROCESSING_UIDS, db_writer_worker, process_email_task
 from worker.agent import create_worker_graph
 
-# --- Configuration Logging ---
+# --- Logging Configuration ---
 logger = logging.getLogger("Orchestrator.Agent")
 
 
@@ -24,7 +24,7 @@ async def bounded_process_task(
 
 
 async def run_orchestrator():
-    # 1. Initialiser le pool et le sous-graphe
+    # 1. Initialize connection pool and worker subgraph
     imap_pool = ImapConnectionPool(size=3)
     await imap_pool.initialize()
 
@@ -32,7 +32,7 @@ async def run_orchestrator():
     compiled_graph = create_worker_graph(imap_pool)
     db_queue = asyncio.Queue()
 
-    # Démarrage du worker DB en arrière-plan
+    # Start DB writer worker task in the background
     asyncio.create_task(db_writer_worker(db_queue))
 
     listener = None
@@ -40,21 +40,21 @@ async def run_orchestrator():
     try:
         while True:
             try:
-                # Connexion ou reconnexion si la socket est fermée
+                # Connect or reconnect if socket is closed
                 if not listener or listener.protocol is None:
-                    logger.info("Connexion du socket d'écoute IMAP...")
+                    logger.info("Connecting IMAP listener socket...")
                     listener = aioimaplib.IMAP4_SSL(
                         host=IMAP_HOST, port=IMAP_PORT
                     )
                     await listener.wait_hello_from_server()
                     await listener.login(IMAP_USER, PASSWORD)
                     await listener.select("INBOX")
-                    logger.info("Écoute active sur la boîte INBOX.")
+                    logger.info("Active listening on INBOX.")
 
-                # 1. Rafraîchir l'état de la boîte via NOOP
+                # 1. Refresh mailbox state via NOOP
                 await listener.noop()
 
-                # 2. Chercher les emails non lus
+                # 2. Search for unseen emails
                 _, search_res = await listener.search("UNSEEN")
                 msg_ids = (
                     search_res[0].split()
@@ -63,12 +63,12 @@ async def run_orchestrator():
                 )
 
                 if msg_ids:
-                    logger.info(f"📬 {len(msg_ids)} email(s) non lu(s) détecté(s).")
+                    logger.info(f"📬 Detected {len(msg_ids)} unseen email(s).")
 
                 for msg_id in msg_ids:
                     msg_num = msg_id.decode()
 
-                    # Fetch du message et de l'UID sans modifier l'état de lecture
+                    # Fetch message and UID without altering read status
                     _, fetch_res = await listener.fetch(
                         msg_num, "(UID BODY.PEEK[])"
                     )
@@ -86,15 +86,15 @@ async def run_orchestrator():
                     )
                     raw_bytes = fetch_res[1]
 
-                    # Déduplication : ignorer si déjà en cours de traitement
+                    # Deduplication: ignore if already currently processing
                     if mail_uid in PROCESSING_UIDS:
-                        logger.debug(f"[UID {mail_uid}] Déjà en cours de traitement, ignoré.")
+                        logger.debug(f"[UID {mail_uid}] Already in progress, skipping.")
                         continue
 
                     PROCESSING_UIDS.add(mail_uid)
-                    logger.info(f"🚀 [UID {mail_uid}] Soumission de la tâche de traitement.")
+                    logger.info(f"🚀 [UID {mail_uid}] Submitting email processing task.")
 
-                    # Lancement asynchrone limité par le sémaphore
+                    # Asynchronous dispatch bounded by semaphore
                     asyncio.create_task(
                         bounded_process_task(
                             agent_semaphore,
@@ -105,12 +105,12 @@ async def run_orchestrator():
                         )
                     )
 
-                # 3. Pause non bloquante avant la prochaine vérification
+                # 3. Non-blocking pause before next polling cycle
                 await asyncio.sleep(5)
 
             except Exception as e:
                 logger.error(
-                    f"Erreur réseau / IMAP dans l'orchestrateur: {e}. Reconnexion dans 5s..."
+                    f"IMAP / Network error in orchestrator: {e}. Reconnecting in 5s..."
                 )
                 if listener:
                     try:

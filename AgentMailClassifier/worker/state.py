@@ -8,15 +8,15 @@ class EmailExtractionResult(BaseModel):
     action_required: bool
 
 class WorkerState(BaseModel):
-    # Entrées brutes reçues de l'orchestrateur
+    # Raw input received from the orchestrator
     mail_uid: str
     raw_bytes: bytes
 
-    # Données intermédiaires après parsing
+    # Intermediate fields populated after MIME/HTML parsing
     sender: Optional[str] = None
     subject: Optional[str] = None
     cleaned_body: Optional[str] = None
 
-    # Sortie finale de l'analyse LLM
+    # Output from the LLM analysis and IMAP move action
     result: Optional[EmailExtractionResult] = None
     moved_to_folder: Optional[str] = None
