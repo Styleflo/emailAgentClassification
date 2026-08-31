@@ -3,7 +3,6 @@ from contextlib import asynccontextmanager
 import logging
 import os
 import sqlite3
-from typing import Optional
 from aioimaplib import aioimaplib
 from model import IMAP_HOST, IMAP_PORT, IMAP_USER, PASSWORD
 
