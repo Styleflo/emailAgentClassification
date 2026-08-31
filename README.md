@@ -167,6 +167,10 @@ OLLAMA_TIMEOUT=600
   ```bash
   ollama pull qwen2.5:1.5b
   ```
+- To enables parallelization:
+  ```bash
+  OLLAMA_NUM_PARALLEL=3 ollama serve
+  ```
 
 ### 2. Start the Orchestrator
 ```bash
