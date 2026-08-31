@@ -6,7 +6,7 @@ from model import IMAP_HOST, IMAP_PORT, IMAP_USER, PASSWORD
 from nodes import PROCESSING_UIDS, db_writer_worker, process_email_task
 from worker.agent import create_worker_graph
 
-# --- Logging Configuration ---
+# Logging Configuration
 logger = logging.getLogger("Orchestrator.Agent")
 
 
@@ -24,7 +24,7 @@ async def bounded_process_task(
 
 
 async def run_orchestrator():
-    # 1. Initialize connection pool and worker subgraph
+    # Initialize connection pool and worker subgraph
     imap_pool = ImapConnectionPool(size=3)
     await imap_pool.initialize()
 
@@ -51,10 +51,10 @@ async def run_orchestrator():
                     await listener.select("INBOX")
                     logger.info("Active listening on INBOX.")
 
-                # 1. Refresh mailbox state via NOOP
+                # Refresh mailbox state via NOOP
                 await listener.noop()
 
-                # 2. Search for unseen emails
+                # Search for unseen emails
                 _, search_res = await listener.search("UNSEEN")
                 msg_ids = (
                     search_res[0].split()
@@ -105,7 +105,7 @@ async def run_orchestrator():
                         )
                     )
 
-                # 3. Non-blocking pause before next polling cycle
+                # Non-blocking pause before next polling cycle
                 await asyncio.sleep(5)
 
             except Exception as e:

@@ -3,6 +3,7 @@ import logging
 from helper import DB_PATH, init_db, insert_classified_email
 from worker.state import WorkerState
 
+# Logging Configuration
 logger = logging.getLogger("Orchestrator.Nodes")
 
 PROCESSING_UIDS = set()

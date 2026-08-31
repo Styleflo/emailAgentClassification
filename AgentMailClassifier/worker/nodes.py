@@ -5,6 +5,8 @@ from langchain_core.messages import SystemMessage, HumanMessage
 from .helper import decode_str, strip_html, clean_text
 from .model import agent, SYSTEM_PROMPT, FOLDER_MAPPING
 
+
+# Logging Configuration
 logger = logging.getLogger("Worker.Nodes")
 
 
@@ -15,11 +17,11 @@ def clean_node(state: WorkerState) -> dict:
     )
     msg = email.message_from_bytes(raw_bytes)
 
-    # 1. Extract Subject and Sender
+    # Extract Subject and Sender
     subject = decode_str(msg.get("Subject", "No Subject"))
     sender = decode_str(msg.get("From", "Unknown Sender"))
 
-    # 2. Traverse MIME parts to isolate text (ignoring attachments and images)
+    # Traverse MIME parts to isolate text (ignoring attachments and images)
     plain_text_parts = []
     html_parts = []
 
@@ -59,7 +61,7 @@ def clean_node(state: WorkerState) -> dict:
             elif content_type == "text/html":
                 html_parts.append(decoded_text)
 
-    # 3. Prioritize plain text; fallback to sanitized HTML if no plain text exists
+    # Prioritize plain text; fallback to sanitized HTML if no plain text exists
     if plain_text_parts:
         raw_body = "\n".join(plain_text_parts)
     elif html_parts:
@@ -72,7 +74,7 @@ def clean_node(state: WorkerState) -> dict:
     mail_uid = state.mail_uid if hasattr(state, "mail_uid") else state.get("mail_uid", "?")
     logger.debug(f"[UID {mail_uid}] Cleaned email: From='{sender}', Subject='{subject}', BodyLen={len(cleaned_body)}")
 
-    # 4. Return the state update dictionary
+    # Return the state update dictionary
     return {
         "sender": sender,
         "subject": subject,

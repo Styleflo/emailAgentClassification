@@ -8,6 +8,7 @@ from typing import Optional
 from aioimaplib import aioimaplib
 from model import IMAP_HOST, IMAP_PORT, IMAP_USER, PASSWORD
 
+# Logging Configuration
 logger = logging.getLogger("Pool.Helper")
 
 DB_PATH = os.getenv("DB_PATH", "classified_emails.db")
@@ -155,7 +156,7 @@ class ImapConnectionPool:
         client = await self.pool.get()
 
         try:
-            # --- 1. Health Check (Keep-Alive / Reconnect) ---
+            # Health Check (Keep-Alive / Reconnect)
             is_alive = False
             try:
                 if client.protocol is not None:
@@ -177,11 +178,11 @@ class ImapConnectionPool:
                     pass
                 client = await self._create_single_client()
 
-            # --- 2. Yield client to worker agent ---
+            # Yield client to worker agent
             yield client
 
         finally:
-            # --- 3. Return connection back to the pool ---
+            # Return connection back to the pool
             await self.pool.put(client)
 
     async def close_all(self):
