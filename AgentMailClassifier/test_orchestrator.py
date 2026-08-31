@@ -20,9 +20,11 @@ class TestOrchestrator(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(state.is_running)
         self.assertEqual(state.processed_count, 5)
 
-    @patch('orchestrateurAgent.helper.aioimaplib.IMAP4_SSL')
+    @patch('helper.aioimaplib.IMAP4_SSL')
     async def test_imap_connection_pool(self, mock_imap_class):
         mock_client = AsyncMock()
+        mock_client.protocol = MagicMock()
+        mock_client.noop.return_value = ("OK", [b"NOOP Completed"])
         mock_imap_class.return_value = mock_client
 
         pool = ImapConnectionPool(size=2)
