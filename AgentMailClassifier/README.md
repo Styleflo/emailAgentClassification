@@ -21,14 +21,14 @@ The project is structured into two main layers:
 [Orchestrator (agent.py)] ── (Deduplication + Semaphore)
         │
         ▼
-┌────────────────── LangGraph Worker Graph ──────────────────┐
-│                                                            │
-│  [clean_node] ──► [classify_node] ──► [move_email_node]    │
+┌────────────────── LangGraph Worker Graph ───────────────────┐
+│                                                             │
+│  [clean_node] ──► [classify_node] ──► [move_email_node]     │
 │  (MIME parse,      (Local LLM:         (Move email & expunge│
 │   HTML strip,       qwen2.5:1.5b        via ImapPool)       │
 │   clean body)       structured output)                      │
-│                                                            │
-└──────────────────────────────┬─────────────────────────────┘
+│                                                             │
+└──────────────────────────────┬──────────────────────────────┘
                                │ (WorkerState)
                                ▼
                    [db_writer_worker (Queue)]
