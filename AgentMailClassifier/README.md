@@ -1,16 +1,26 @@
 # AgentMailClassifier
 
-An asynchronous, agentic email triage and classification system built with **LangGraph**, **LangChain Ollama**, and **aioimaplib**.
+An asynchronous, agentic email triage and classification system built with **LangGraph**, **LangChain Ollama**, **aioimaplib**, and **SQLite**.
 
-The system polls an IMAP mailbox, processes incoming emails concurrently using a LangGraph worker pipeline, classifies messages using a local LLM (`qwen2.5:1.5b`), moves emails to appropriate destination folders via an IMAP connection pool, and forwards metadata to a background queue for persistence.
+The system continuously polls an IMAP mailbox, processes incoming emails concurrently through a LangGraph worker pipeline, classifies messages using a local LLM (`qwen2.5:1.5b`), moves emails to appropriate destination folders via a managed IMAP connection pool, logs operational events to rotating files and console, and persists structured classification records to a SQLite database.
 
 ---
 
 ## 🏗 Architecture & Overview
 
-The project is structured into two main layers:
-1. **Orchestrator Layer** (`AgentMailClassifier/`): Manages IMAP listener polling, concurrency bounds, connection pooling, and background DB ingestion queues.
-2. **Worker Graph Layer** (`AgentMailClassifier/worker/`): A compiled LangGraph workflow that cleans, classifies, and moves individual emails.
+The project is designed with a clear separation of concerns across two primary layers:
+
+1. **Orchestrator Layer** (`AgentMailClassifier/`):
+   - Maintains an IMAP listener socket to detect `UNSEEN` emails without marking them read (`BODY.PEEK[]`).
+   - Limits concurrency with `asyncio.Semaphore` and manages an `ImapConnectionPool`.
+   - Handles email deduplication via tracked in-flight UIDs (`PROCESSING_UIDS`).
+   - Runs a background worker (`db_writer_worker`) consuming classification results from an `asyncio.Queue`.
+
+2. **Worker Graph Layer** (`AgentMailClassifier/worker/`):
+   - A compiled LangGraph workflow: `clean` ➔ `classify` ➔ `move_email`.
+   - Extracts and sanitizes plain text / HTML (ignoring attachments).
+   - Generates structured classification results via local Ollama LLM.
+   - Moves messages to the mapped IMAP folder and expunges them from `INBOX`.
 
 ### Workflow Diagram
 
@@ -32,6 +42,9 @@ The project is structured into two main layers:
                                │ (WorkerState)
                                ▼
                    [db_writer_worker (Queue)]
+                               │
+                               ▼
+                [SQLite DB (classified_emails)]
 ```
 
 ---
@@ -40,19 +53,19 @@ The project is structured into two main layers:
 
 ```
 AgentMailClassifier/
-├── config.py              # Centralized environment variables, LLM, IMAP, & DB settings
+├── config.py              # Centralized configuration (IMAP, LLM, DB, Logging, Concurrency)
 ├── agentOrchestrateur.py   # Main entry point to launch the orchestrator loop
-├── agent.py               # Core orchestrator loop, IMAP listener, task distribution
-├── helper.py              # Asynchronous IMAP connection pool, logging & DB helpers
-├── model.py               # IMAP configuration re-exports
+├── agent.py               # Core orchestrator loop, IMAP listener, bounded task distribution
+├── helper.py              # IMAP connection pool, SQLite DB init/insert, rotating file logging
+├── model.py               # IMAP configuration re-exports (backward compatibility)
 ├── nodes.py               # Orchestrator-level worker tasks & DB write queue consumer
 ├── state.py               # Orchestrator Pydantic state model
-├── test_orchestrator.py   # Unit test suite for orchestrator components
+├── test_orchestrator.py   # Comprehensive unit test suite
 └── worker/
     ├── __init__.py
     ├── agent.py           # LangGraph StateGraph definition (clean -> classify -> move)
-    ├── helper.py          # Email MIME decoders, HTML sanitization, text cleaners
-    ├── model.py           # ChatOllama model client definition
+    ├── helper.py          # MIME header decoders, HTML stripper, email text sanitizer
+    ├── model.py           # ChatOllama model client with structured output
     ├── nodes.py           # Worker LangGraph nodes (clean_node, classify_node, move_email_node)
     └── state.py           # WorkerState & EmailExtractionResult Pydantic models
 ```
@@ -71,39 +84,85 @@ Incoming emails are extracted and classified into exactly one of three categorie
 
 ---
 
-## ⚙️ Prerequisites & Environment Setup
+## 🗄 Database Persistence (SQLite)
 
-### 1. Requirements
-- Python 3.10+
-- [Ollama](https://ollama.com/) running locally with the `qwen2.5:1.5b` model pulled:
-  ```bash
-  ollama pull qwen2.5:1.5b
-  ```
+Classified email metadata is sequentially stored in SQLite (`classified_emails.db` by default) via the background `db_writer_worker`.
 
-### 2. Environment Variables
-Create a `.env` file in the project root with your IMAP credentials:
+### Table Schema: `classified_emails`
+```sql
+CREATE TABLE IF NOT EXISTS classified_emails (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    mail_uid TEXT NOT NULL UNIQUE,
+    sender TEXT,
+    subject TEXT,
+    cleaned_body_preview TEXT,
+    category TEXT CHECK(category IN ('Trash', 'Information', 'Review')),
+    summary TEXT,
+    action_required BOOLEAN,
+    moved_to_folder TEXT,
+    processed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+---
+
+## 📝 Logging System
+
+The application features a dual logging system configured in `helper.py`:
+- **Console Output**: Real-time human-readable stdout logs with `[UID <id>]` traceability.
+- **Rotating File Logs**: Stored in `logs/agent.log` (rotates up to 10 MB per file, keeping 5 backup archives).
+
+---
+
+## ⚙️ Configuration & Environment Variables
+
+All settings can be customized in a root `.env` file or through environment variables (loaded via `config.py`):
 
 ```env
+# --- IMAP Settings ---
 IMAP_SERVER=imap.example.com
 IMAP_PORT=993
 MAIL_USERNAME=your-email@example.com
 PASSWORD=your-app-password
+IMAP_POOL_SIZE=3
+
+# --- Concurrency & Polling ---
+MAX_CONCURRENT_WORKERS=3
+POLL_INTERVAL_SECONDS=5
+
+# --- Database ---
+DB_PATH=classified_emails.db
+
+# --- Logging ---
+LOG_DIR=logs
+LOG_FILE=agent.log
+LOG_MAX_BYTES=10485760
+LOG_BACKUP_COUNT=5
+
+# --- Ollama / LLM ---
+OLLAMA_MODEL=qwen2.5:1.5b
+OLLAMA_TEMPERATURE=0.0
+OLLAMA_NUM_PREDICT=25000
+OLLAMA_TIMEOUT=600
 ```
 
 ---
 
 ## 🚀 Running the Application
 
-### Start the Orchestrator
-To start listening and classifying incoming emails:
+### 1. Prerequisites
+- Python 3.10+
+- [Ollama](https://ollama.com/) running locally with the target model:
+  ```bash
+  ollama pull qwen2.5:1.5b
+  ```
 
+### 2. Start the Orchestrator
 ```bash
 python agentOrchestrateur.py
 ```
 
-### Running Tests
-Execute the test suite using `unittest`:
-
+### 3. Running Unit Tests
 ```bash
 python -m unittest discover -s . -p "test_*.py"
 ```
