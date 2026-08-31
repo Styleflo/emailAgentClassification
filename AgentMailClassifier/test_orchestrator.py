@@ -46,12 +46,28 @@ class TestOrchestrator(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(mock_client.logout.call_count, 2)
 
     async def test_db_writer_worker(self):
-        db_queue = asyncio.Queue()
-        # Put an item to DB writer queue
-        await db_queue.put({"test": "data"})
+        import tempfile
+        import sqlite3
+        with tempfile.NamedTemporaryFile(suffix=".db") as tmp:
+            test_db_path = tmp.name
 
-        # Run db_writer_worker task
-        task = asyncio.create_task(db_writer_worker(db_queue))
+        db_queue = asyncio.Queue()
+        test_record = {
+            "mail_uid": "999",
+            "sender": "sender@test.com",
+            "subject": "Test Subject",
+            "cleaned_body": "Test body content",
+            "result": EmailExtractionResult(
+                category="Information",
+                summary="A receipt summary",
+                action_required=False
+            ),
+            "moved_to_folder": "Information"
+        }
+        await db_queue.put(test_record)
+
+        # Run db_writer_worker task with test_db_path
+        task = asyncio.create_task(db_writer_worker(db_queue, db_path=test_db_path))
 
         # Yield control to let it process
         await asyncio.sleep(0.1)
@@ -59,6 +75,23 @@ class TestOrchestrator(unittest.IsolatedAsyncioTestCase):
         # Confirm queue is empty
         self.assertEqual(db_queue.qsize(), 0)
         task.cancel()
+
+        # Check DB contents
+        with sqlite3.connect(test_db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT mail_uid, sender, subject, category, summary, action_required, moved_to_folder FROM classified_emails WHERE mail_uid = ?", ("999",))
+            row = cursor.fetchone()
+            self.assertIsNotNone(row)
+            self.assertEqual(row[0], "999")
+            self.assertEqual(row[1], "sender@test.com")
+            self.assertEqual(row[2], "Test Subject")
+            self.assertEqual(row[3], "Information")
+            self.assertEqual(row[4], "A receipt summary")
+            self.assertEqual(row[5], 0)
+            self.assertEqual(row[6], "Information")
+
+        if os.path.exists(test_db_path):
+            os.remove(test_db_path)
 
     async def test_process_email_task(self):
         mock_compiled_graph = AsyncMock()
