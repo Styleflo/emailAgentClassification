@@ -86,7 +86,7 @@ def classify_node(state: WorkerState) -> dict:
     subject = state.subject if hasattr(state, "subject") else state.get("subject")
     cleaned_body = state.cleaned_body if hasattr(state, "cleaned_body") else state.get("cleaned_body")
 
-    logger.info(f"🤖 [UID {mail_uid}] LLM inference in progress...")
+    logger.info(f"[UID {mail_uid}] LLM inference in progress...")
 
     user_content = f"""
     From: {sender}
@@ -101,7 +101,7 @@ def classify_node(state: WorkerState) -> dict:
 
     extraction_result: EmailExtractionResult = agent.invoke(messages)
     logger.info(
-        f"🎯 [UID {mail_uid}] LLM Result: Category='{extraction_result.category}', ActionRequired={extraction_result.action_required}"
+        f"[UID {mail_uid}] LLM Result: Category='{extraction_result.category}', ActionRequired={extraction_result.action_required}"
     )
 
     return {"result": extraction_result}
@@ -117,7 +117,7 @@ async def move_email_node(state: WorkerState, imap_pool: "ImapConnectionPool") -
     category = result.category
     target_folder = FOLDER_MAPPING.get(category)
 
-    logger.info(f"📂 [UID {mail_uid}] Moving email to '{target_folder}'...")
+    logger.info(f"[UID {mail_uid}] Moving email to '{target_folder}'...")
 
     # Acquire a dedicated connection from the pool to perform IMAP actions
     async with imap_pool.get_connection() as imap_client:
@@ -130,7 +130,7 @@ async def move_email_node(state: WorkerState, imap_pool: "ImapConnectionPool") -
             # Flag the original message as Deleted and expunge to complete the move
             await imap_client.uid("STORE", mail_uid, "+FLAGS", r"(\Deleted)")
             await imap_client.expunge()
-            logger.info(f"✨ [UID {mail_uid}] Email moved and expunged from INBOX successfully.")
+            logger.info(f"[UID {mail_uid}] Email moved and expunged from INBOX successfully.")
         else:
             raise RuntimeError(
                 f"Failed to copy email UID {mail_uid} to {target_folder}"

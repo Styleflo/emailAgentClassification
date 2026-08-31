@@ -12,7 +12,7 @@ async def process_email_task(
     mail_uid: str, raw_bytes: bytes, compiled_graph, db_queue: asyncio.Queue
 ):
     """Background task executed by a worker agent with deduplication."""
-    logger.info(f"⚡ [UID {mail_uid}] Starting analysis...")
+    logger.info(f"[UID {mail_uid}] Starting analysis...")
     try:
         initial_state = WorkerState(mail_uid=mail_uid, raw_bytes=raw_bytes)
         final_state = await compiled_graph.ainvoke(initial_state)
@@ -24,12 +24,12 @@ async def process_email_task(
         )
         target_folder = final_state.get("moved_to_folder", "Not moved")
         logger.info(
-            f"✅ [UID {mail_uid}] Classified as '{category}' -> Moved to '{target_folder}'"
+            f"[UID {mail_uid}] Classified as '{category}' -> Moved to '{target_folder}'"
         )
 
         await db_queue.put(final_state)
     except Exception as e:
-        logger.error(f"❌ [UID {mail_uid}] Error during processing: {e}")
+        logger.error(f"[UID {mail_uid}] Error during processing: {e}")
     finally:
         # Always release the UID once processing is complete
         PROCESSING_UIDS.discard(mail_uid)
@@ -48,7 +48,7 @@ async def db_writer_worker(db_queue: asyncio.Queue, db_path: str = DB_PATH):
         try:
             if isinstance(record, dict) and record.get("mail_uid"):
                 await asyncio.to_thread(insert_classified_email, record, db_path)
-                logger.info(f"💾 [UID {record.get('mail_uid')}] Record persisted to database.")
+                logger.info(f"[UID {record.get('mail_uid')}] Record persisted to database.")
         except Exception as e:
             logger.error(f"DB write error: {e}")
         finally:

@@ -63,7 +63,7 @@ async def run_orchestrator():
                 )
 
                 if msg_ids:
-                    logger.info(f"📬 Detected {len(msg_ids)} unseen email(s).")
+                    logger.info(f"Detected {len(msg_ids)} unseen email(s).")
 
                 for msg_id in msg_ids:
                     msg_num = msg_id.decode()
@@ -92,7 +92,7 @@ async def run_orchestrator():
                         continue
 
                     PROCESSING_UIDS.add(mail_uid)
-                    logger.info(f"🚀 [UID {mail_uid}] Submitting email processing task.")
+                    logger.info(f"[UID {mail_uid}] Submitting email processing task.")
 
                     # Asynchronous dispatch bounded by semaphore
                     asyncio.create_task(
