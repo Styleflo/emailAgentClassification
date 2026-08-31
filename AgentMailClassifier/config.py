@@ -3,18 +3,18 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# --- IMAP Configuration ---
+# IMAP Configuration
 IMAP_HOST = os.getenv("IMAP_SERVER")
-IMAP_PORT = int(os.getenv("IMAP_PORT", 993)) if os.getenv("IMAP_PORT") else 993
+IMAP_PORT = int(os.getenv("IMAP_PORT", 993))
 IMAP_USER = os.getenv("MAIL_USERNAME")
 PASSWORD = os.getenv("PASSWORD")
 IMAP_POOL_SIZE = int(os.getenv("IMAP_POOL_SIZE", 3))
 
-# --- Concurrency & Orchestrator ---
+# Concurrency & Orchestrator
 MAX_CONCURRENT_WORKERS = int(os.getenv("MAX_CONCURRENT_WORKERS", 3))
 POLL_INTERVAL_SECONDS = int(os.getenv("POLL_INTERVAL_SECONDS", 5))
 
-# --- Database Storage ---
+# Database Storage
 DB_PATH = os.getenv("DB_PATH", "classified_emails.db")
 
 # --- Logging Configuration ---
@@ -23,7 +23,7 @@ LOG_FILE = os.getenv("LOG_FILE", "agent.log")
 LOG_MAX_BYTES = int(os.getenv("LOG_MAX_BYTES", 10 * 1024 * 1024))  # 10 MB
 LOG_BACKUP_COUNT = int(os.getenv("LOG_BACKUP_COUNT", 5))
 
-# --- LLM & Classification ---
+# LLM & Classification
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen2.5:1.5b")
 OLLAMA_TEMPERATURE = float(os.getenv("OLLAMA_TEMPERATURE", 0.0))
 OLLAMA_NUM_PREDICT = int(os.getenv("OLLAMA_NUM_PREDICT", 25000))
