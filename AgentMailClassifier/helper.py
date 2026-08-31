@@ -1,10 +1,89 @@
 import asyncio
 from contextlib import asynccontextmanager
 import logging
+import os
+import sqlite3
+from typing import Optional
 from aioimaplib import aioimaplib
 from model import IMAP_HOST, IMAP_PORT, IMAP_USER, PASSWORD
 
 logger = logging.getLogger("Pool.Helper")
+
+DB_PATH = os.getenv("DB_PATH", "classified_emails.db")
+
+
+def init_db(db_path: str = DB_PATH):
+    """Initialise la base de données SQLite et crée la table si nécessaire."""
+    with sqlite3.connect(db_path) as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS classified_emails (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                mail_uid TEXT NOT NULL UNIQUE,
+                sender TEXT,
+                subject TEXT,
+                cleaned_body_preview TEXT,
+                category TEXT CHECK(category IN ('Trash', 'Information', 'Review')),
+                summary TEXT,
+                action_required BOOLEAN,
+                moved_to_folder TEXT,
+                processed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+        conn.commit()
+
+
+def insert_classified_email(record: dict, db_path: str = DB_PATH):
+    """Insère un enregistrement classifié dans la base SQLite."""
+    mail_uid = record.get("mail_uid")
+    sender = record.get("sender")
+    subject = record.get("subject")
+    cleaned_body = record.get("cleaned_body")
+    cleaned_body_preview = cleaned_body[:500] if cleaned_body else None
+
+    result = record.get("result")
+    category = None
+    summary = None
+    action_required = None
+
+    if result:
+        category = getattr(result, "category", None) or (
+            result.get("category") if isinstance(result, dict) else None
+        )
+        summary = getattr(result, "summary", None) or (
+            result.get("summary") if isinstance(result, dict) else None
+        )
+        action_required = getattr(
+            result, "action_required", None
+        ) if hasattr(result, "action_required") else (
+            result.get("action_required") if isinstance(result, dict) else None
+        )
+
+    moved_to_folder = record.get("moved_to_folder")
+
+    with sqlite3.connect(db_path) as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            INSERT OR REPLACE INTO classified_emails (
+                mail_uid, sender, subject, cleaned_body_preview, category, summary, action_required, moved_to_folder
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                mail_uid,
+                sender,
+                subject,
+                cleaned_body_preview,
+                category,
+                summary,
+                action_required,
+                moved_to_folder,
+            ),
+        )
+        conn.commit()
+
 
 
 class ImapConnectionPool:
