@@ -52,22 +52,31 @@ The project is designed with a clear separation of concerns across two primary l
 ## 📂 Project Structure
 
 ```
-AgentMailClassifier/
-├── config.py              # Centralized configuration (IMAP, LLM, DB, Logging, Concurrency)
-├── agentOrchestrateur.py   # Main entry point to launch the orchestrator loop
-├── agent.py               # Core orchestrator loop, IMAP listener, bounded task distribution
-├── helper.py              # IMAP connection pool, SQLite DB init/insert, rotating file logging
-├── model.py               # IMAP configuration re-exports (backward compatibility)
-├── nodes.py               # Orchestrator-level worker tasks & DB write queue consumer
-├── state.py               # Orchestrator Pydantic state model
-├── test_orchestrator.py   # Comprehensive unit test suite
-└── worker/
+emailAgentClassification/
+├── .env                    # Environment variables (credentials, paths, model settings)
+├── .gitignore              # Ignored files (venv, data/, logs/, __pycache__)
+├── README.md               # Project documentation & usage instructions
+├── data/                   # Runtime SQLite database storage (classified_emails.db)
+├── logs/                   # Application rotating log files (agent.log)
+├── tests/                  # Automated test suite
+│   ├── __init__.py
+│   └── test_orchestrator.py
+└── src/                    # Application source code
     ├── __init__.py
-    ├── agent.py           # LangGraph StateGraph definition (clean -> classify -> move)
-    ├── helper.py          # MIME header decoders, HTML stripper, email text sanitizer
-    ├── model.py           # ChatOllama model client with structured output
-    ├── nodes.py           # Worker LangGraph nodes (clean_node, classify_node, move_email_node)
-    └── state.py           # WorkerState & EmailExtractionResult Pydantic models
+    ├── config.py           # Centralized configuration & root-anchored path resolution
+    ├── agentOrchestrateur.py # Main entry point to launch the orchestrator loop
+    ├── agent.py            # Core orchestrator loop, IMAP listener, task distribution
+    ├── helper.py           # IMAP connection pool, SQLite DB helpers, logging setup
+    ├── model.py            # IMAP configuration re-exports
+    ├── nodes.py            # Orchestrator-level worker tasks & DB write queue consumer
+    ├── state.py            # Orchestrator Pydantic state model
+    └── worker/             # LangGraph Worker Subpackage
+        ├── __init__.py
+        ├── agent.py        # LangGraph StateGraph definition (clean -> classify -> move)
+        ├── helper.py       # MIME header decoders, HTML stripper, text sanitizer
+        ├── model.py        # ChatOllama model client with structured output
+        ├── nodes.py        # Worker LangGraph nodes (clean_node, classify_node, move_email_node)
+        └── state.py        # WorkerState & EmailExtractionResult Pydantic models
 ```
 
 ---
@@ -86,7 +95,7 @@ Incoming emails are extracted and classified into exactly one of three categorie
 
 ## 🗄 Database Persistence (SQLite)
 
-Classified email metadata is sequentially stored in SQLite (`classified_emails.db` by default) via the background `db_writer_worker`.
+Classified email metadata is sequentially stored in SQLite (`data/classified_emails.db` by default) via the background `db_writer_worker`.
 
 ### Table Schema: `classified_emails`
 ```sql
@@ -116,7 +125,7 @@ The application features a dual logging system configured in `helper.py`:
 
 ## ⚙️ Configuration & Environment Variables
 
-All settings can be customized in a root `.env` file or through environment variables (loaded via `config.py`):
+All settings can be customized in a root `.env` file or through environment variables (loaded via `src/config.py`):
 
 ```env
 # --- IMAP Settings ---
@@ -131,7 +140,7 @@ MAX_CONCURRENT_WORKERS=3
 POLL_INTERVAL_SECONDS=5
 
 # --- Database ---
-DB_PATH=classified_emails.db
+DB_PATH=data/classified_emails.db
 
 # --- Logging ---
 LOG_DIR=logs
@@ -159,10 +168,10 @@ OLLAMA_TIMEOUT=600
 
 ### 2. Start the Orchestrator
 ```bash
-python agentOrchestrateur.py
+python src/agentOrchestrateur.py
 ```
 
 ### 3. Running Unit Tests
 ```bash
-python -m unittest discover -s . -p "test_*.py"
+python -m unittest discover -s tests -p "test_*.py"
 ```
