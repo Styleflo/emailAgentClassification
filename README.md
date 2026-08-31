@@ -10,13 +10,13 @@ The system continuously polls an IMAP mailbox, processes incoming emails concurr
 
 The project is designed with a clear separation of concerns across two primary layers:
 
-1. **Orchestrator Layer** (`AgentMailClassifier/`):
+1. **Orchestrator Layer** (`src/`):
    - Maintains an IMAP listener socket to detect `UNSEEN` emails without marking them read (`BODY.PEEK[]`).
    - Limits concurrency with `asyncio.Semaphore` and manages an `ImapConnectionPool`.
    - Handles email deduplication via tracked in-flight UIDs (`PROCESSING_UIDS`).
    - Runs a background worker (`db_writer_worker`) consuming classification results from an `asyncio.Queue`.
 
-2. **Worker Graph Layer** (`AgentMailClassifier/worker/`):
+2. **Worker Graph Layer** (`src/worker/`):
    - A compiled LangGraph workflow: `clean` ➔ `classify` ➔ `move_email`.
    - Extracts and sanitizes plain text / HTML (ignoring attachments).
    - Generates structured classification results via local Ollama LLM.
@@ -93,9 +93,11 @@ Incoming emails are extracted and classified into exactly one of three categorie
 
 ---
 
-## 🗄 Database Persistence (SQLite)
+## 🗄 Database Persistence & Dynamic Migration (SQLite)
 
 Classified email metadata is sequentially stored in SQLite (`data/classified_emails.db` by default) via the background `db_writer_worker`.
+
+The database automatically manages schema creation and dynamically applies table migrations when new categories are configured in `FOLDER_MAPPING`.
 
 ### Table Schema: `classified_emails`
 ```sql
@@ -107,7 +109,7 @@ CREATE TABLE IF NOT EXISTS classified_emails (
     cleaned_body_preview TEXT,
     category TEXT CHECK(category IN ('Trash', 'Information', 'Review')),
     summary TEXT,
-    action_required BOOLEAN,
+    action_required INTEGER CHECK(action_required IN (0, 1)),
     moved_to_folder TEXT,
     processed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
