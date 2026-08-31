@@ -6,7 +6,7 @@ The system continuously polls an IMAP mailbox, processes incoming emails concurr
 
 ---
 
-## 🏗 Architecture & Overview
+## Architecture & Overview
 
 The project is designed with a clear separation of concerns across two primary layers:
 
@@ -49,7 +49,7 @@ The project is designed with a clear separation of concerns across two primary l
 
 ---
 
-## 📂 Project Structure
+## Project Structure
 
 ```
 emailAgentClassification/
@@ -81,7 +81,7 @@ emailAgentClassification/
 
 ---
 
-## 🏷 Classification Categories & Routing
+## Classification Categories & Routing
 
 Incoming emails are extracted and classified into exactly one of three categories:
 
@@ -93,7 +93,7 @@ Incoming emails are extracted and classified into exactly one of three categorie
 
 ---
 
-## 🗄 Database Persistence & Dynamic Migration (SQLite)
+## Database Persistence & Dynamic Migration (SQLite)
 
 Classified email metadata is sequentially stored in SQLite (`data/classified_emails.db` by default) via the background `db_writer_worker`.
 
@@ -125,32 +125,32 @@ The application features a dual logging system configured in `helper.py`:
 
 ---
 
-## ⚙️ Configuration & Environment Variables
+## Configuration & Environment Variables
 
 All settings can be customized in a root `.env` file or through environment variables (loaded via `src/config.py`):
 
 ```env
-# --- IMAP Settings ---
+# IMAP Settings
 IMAP_SERVER=imap.example.com
 IMAP_PORT=993
 MAIL_USERNAME=your-email@example.com
 PASSWORD=your-app-password
 IMAP_POOL_SIZE=3
 
-# --- Concurrency & Polling ---
+# Concurrency & Polling
 MAX_CONCURRENT_WORKERS=3
 POLL_INTERVAL_SECONDS=5
 
-# --- Database ---
+# Database
 DB_PATH=data/classified_emails.db
 
-# --- Logging ---
+# Logging
 LOG_DIR=logs
 LOG_FILE=agent.log
 LOG_MAX_BYTES=10485760
 LOG_BACKUP_COUNT=5
 
-# --- Ollama / LLM ---
+# Ollama / LLM
 OLLAMA_MODEL=qwen2.5:1.5b
 OLLAMA_TEMPERATURE=0.0
 OLLAMA_NUM_PREDICT=25000
