@@ -1,8 +1,16 @@
 import asyncio
 import logging
 from aioimaplib import aioimaplib
+from config import (
+    IMAP_HOST,
+    IMAP_POOL_SIZE,
+    IMAP_PORT,
+    IMAP_USER,
+    MAX_CONCURRENT_WORKERS,
+    PASSWORD,
+    POLL_INTERVAL_SECONDS,
+)
 from helper import ImapConnectionPool
-from model import IMAP_HOST, IMAP_PORT, IMAP_USER, PASSWORD
 from nodes import PROCESSING_UIDS, db_writer_worker, process_email_task
 from worker.agent import create_worker_graph
 
@@ -25,10 +33,10 @@ async def bounded_process_task(
 
 async def run_orchestrator():
     # Initialize connection pool and worker subgraph
-    imap_pool = ImapConnectionPool(size=3)
+    imap_pool = ImapConnectionPool(size=IMAP_POOL_SIZE)
     await imap_pool.initialize()
 
-    agent_semaphore = asyncio.Semaphore(3)
+    agent_semaphore = asyncio.Semaphore(MAX_CONCURRENT_WORKERS)
     compiled_graph = create_worker_graph(imap_pool)
     db_queue = asyncio.Queue()
 
@@ -106,7 +114,7 @@ async def run_orchestrator():
                     )
 
                 # Non-blocking pause before next polling cycle
-                await asyncio.sleep(5)
+                await asyncio.sleep(POLL_INTERVAL_SECONDS)
 
             except Exception as e:
                 logger.error(
@@ -118,7 +126,7 @@ async def run_orchestrator():
                     except Exception:
                         pass
                     listener = None
-                await asyncio.sleep(5)
+                await asyncio.sleep(POLL_INTERVAL_SECONDS)
 
     finally:
         if listener:

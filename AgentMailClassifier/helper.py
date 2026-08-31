@@ -6,22 +6,28 @@ import os
 import sqlite3
 from typing import Optional
 from aioimaplib import aioimaplib
-from model import IMAP_HOST, IMAP_PORT, IMAP_USER, PASSWORD
+from config import (
+    DB_PATH,
+    IMAP_HOST,
+    IMAP_PORT,
+    IMAP_USER,
+    LOG_BACKUP_COUNT,
+    LOG_DIR,
+    LOG_FILE,
+    LOG_MAX_BYTES,
+    PASSWORD,
+)
 
 # Logging Configuration
 logger = logging.getLogger("Pool.Helper")
-
-DB_PATH = os.getenv("DB_PATH", "classified_emails.db")
-LOG_DIR = os.getenv("LOG_DIR", os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs"))
-LOG_FILE = os.getenv("LOG_FILE", "agent.log")
 
 
 def setup_logging(
     log_dir: str = LOG_DIR,
     log_filename: str = LOG_FILE,
     level: int = logging.INFO,
-    max_bytes: int = 10 * 1024 * 1024,
-    backup_count: int = 5,
+    max_bytes: int = LOG_MAX_BYTES,
+    backup_count: int = LOG_BACKUP_COUNT,
 ):
     """Configures global logging with both console and rotating file outputs."""
     os.makedirs(log_dir, exist_ok=True)

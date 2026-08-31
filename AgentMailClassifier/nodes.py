@@ -1,6 +1,7 @@
 import asyncio
 import logging
-from helper import DB_PATH, init_db, insert_classified_email
+from config import DB_PATH
+from helper import init_db, insert_classified_email
 from worker.state import WorkerState
 
 # Logging Configuration
