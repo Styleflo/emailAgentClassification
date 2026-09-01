@@ -1,0 +1,7 @@
+aioimaplib==2.0.1
+beautifulsoup4==4.15.0
+langchain_core==1.6.1
+langchain_ollama==1.1.0
+langgraph==1.2.11
+pydantic==2.13.5
+python-dotenv==1.2.3
